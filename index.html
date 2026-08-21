@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Badminton Matchmaker</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f3f4f6;
+            --card: #ffffff;
+            --text: #1f2937;
+            --text-light: #6b7280;
+            --border: #e5e7eb;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding-bottom: 70px; -webkit-tap-highlight-color: transparent; }
+        header { background: var(--primary); color: white; padding: 1rem; text-align: center; font-size: 1.25rem; font-weight: bold; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .container { padding: 1rem; max-width: 800px; margin: 0 auto; }
+        .card { background: var(--card); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .hidden { display: none !important; }
+        
+        /* Typography & Layout */
+        h2 { font-size: 1.25rem; margin-bottom: 1rem; color: var(--text); }
+        .flex { display: flex; }
+        .justify-between { justify-content: space-between; }
+        .align-center { align-items: center; }
+        .grid { display: grid; gap: 0.5rem; }
+        .grid-2 { grid-template-columns: 1fr 1fr; }
+        
+        /* Inputs & Buttons */
+        input, select { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1rem; font-size: 1rem; }
+        button { background: var(--primary); color: white; border: none; padding: 0.875rem; border-radius: 8px; font-size: 1rem; font-weight: bold; width: 100%; cursor: pointer; transition: background 0.2s; }
+        button:active { background: var(--primary-hover); }
+        button.danger { background: var(--danger); }
+        button.success { background: var(--success); }
+        button.outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+        
+        /* Player List Styles */
+        .player-row { padding: 0.75rem 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .player-row:last-child { border-bottom: none; }
+        .player-info { display: flex; flex-direction: column; }
+        .player-name { font-weight: bold; font-size: 1.1rem; }
+        .player-meta { font-size: 0.85rem; color: var(--text-light); }
+        .toggle-active { transform: scale(1.3); margin-right: 1rem; }
+        
+        /* Match Styles */
+        .team-box { border: 2px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+        .team-title { font-weight: bold; text-align: center; margin-bottom: 0.5rem; color: var(--primary); }
+        .vs { text-align: center; font-weight: bold; margin: 1rem 0; color: var(--text-light); }
+        .match-stats { background: #e0e7ff; padding: 0.75rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; color: #3730a3; }
+        
+        /* Bottom Nav */
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: var(--card); display: flex; border-top: 1px solid var(--border); box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
+        .nav-item { flex: 1; padding: 1rem 0; text-align: center; color: var(--text-light); cursor: pointer; font-size: 0.85rem; font-weight: bold; }
+        .nav-item.active { color: var(--primary); border-top: 3px solid var(--primary); }
+    </style>
+</head>
+<body>
+
+<header>Badminton Matchmaker</header>
+
+<!-- VIEW: PLAYERS -->
+<div id="view-players" class="container">
+    <button onclick="toggleAddPlayerForm()" style="margin-bottom: 1rem;">+ Add New Player</button>
+    
+    <div id="add-player-form" class="card hidden">
+        <input type="text" id="p-name" placeholder="Player Name" required>
+        <div class="grid grid-2">
+            <select id="p-gender">
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+            </select>
+            <select id="p-skill">
+                <option value="1">New</option>
+                <option value="2">BG1</option>
+                <option value="3">BG2</option>
+                <option value="4">N-</option>
+                <option value="5">N</option>
+                <option value="6">N+</option>
+            </select>
+        </div>
+        <button onclick="addPlayer()">Save Player</button>
+    </div>
+
+    <div class="card">
+        <h2>Available Players (<span id="active-count">0</span>)</h2>
+        <p style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 1rem;">Check the box to include in matchmaking.</p>
+        <div id="player-list"></div>
+    </div>
+</div>
+
+<!-- VIEW: MATCH -->
+<div id="view-match" class="container hidden">
+    <button onclick="generateMatch()" style="height: 60px; font-size: 1.2rem;">🎲 Generate Match</button>
+    
+    <div id="current-match" class="card hidden" style="margin-top: 1rem;">
+        <div class="match-stats" id="match-logic-stats"></div>
+        <div class="team-box">
+            <div class="team-title">Team A</div>
+            <div id="team-a-content"></div>
+        </div>
+        <div class="vs">VS</div>
+        <div class="team-box">
+            <div class="team-title">Team B</div>
+            <div id="team-b-content"></div>
+        </div>
+        
+        <div class="grid grid-2" style="margin-top: 1.5rem;">
+            <button class="outline" onclick="generateMatch()">Reroll</button>
+            <button class="success" onclick="confirmMatch()">Confirm Match</button>
+        </div>
+    </div>
+</div>
+
+<!-- VIEW: HISTORY -->
+<div id="view-history" class="container hidden">
+    <div class="flex justify-between align-center" style="margin-bottom: 1rem;">
+        <h2>Match History</h2>
+        <button class="danger" style="width: auto; padding: 0.5rem 1rem;" onclick="clearHistory()">Clear All</button>
+    </div>
+    <div id="history-list"></div>
+</div>
+
+<!-- VIEW: STATS -->
+<div id="view-stats" class="container hidden">
+    <h2>Player Statistics</h2>
+    <div class="card" id="stats-list"></div>
+</div>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+    <div class="nav-item active" onclick="switchTab('players')" id="nav-players">Players</div>
+    <div class="nav-item" onclick="switchTab('match')" id="nav-match">Match</div>
+    <div class="nav-item" onclick="switchTab('history')" id="nav-history">History</div>
+    <div class="nav-item" onclick="switchTab('stats')" id="nav-stats">Stats</div>
+</div>
+
+<script>
+    // --- STATE MANAGEMENT & LOCAL STORAGE ---
+    const SKILL_MAP = { 1: 'New', 2: 'BG1', 3: 'BG2', 4: 'N-', 5: 'N', 6: 'N+' };
+    let players = JSON.parse(localStorage.getItem('bm_players')) || [];
+    let historyData = JSON.parse(localStorage.getItem('bm_history')) || [];
+    let currentPendingMatch = null;
+
+    function saveData() {
+        localStorage.setItem('bm_players', JSON.stringify(players));
+        localStorage.setItem('bm_history', JSON.stringify(historyData));
+    }
+
+    // --- UI NAVIGATION ---
+    function switchTab(tab) {
+        ['players', 'match', 'history', 'stats'].forEach(t => {
+            document.getElementById(`view-${t}`).classList.add('hidden');
+            document.getElementById(`nav-${t}`).classList.remove('active');
+        });
+        document.getElementById(`view-${tab}`).classList.remove('hidden');
+        document.getElementById(`nav-${tab}`).classList.add('active');
+        
+        if(tab === 'players') renderPlayers();
+        if(tab === 'history') renderHistory();
+        if(tab === 'stats') renderStats();
+    }
+
+    // --- PLAYER MANAGEMENT ---
+    function toggleAddPlayerForm() {
+        const form = document.getElementById('add-player-form');
+        form.classList.toggle('hidden');
+    }
+
+    function addPlayer() {
+        const name = document.getElementById('p-name').value.trim();
+        const gender = document.getElementById('p-gender').value;
+        const skill = parseInt(document.getElementById('p-skill').value);
+        
+        if (!name) return alert('Enter a name');
+        
+        players.push({
+            id: Date.now().toString(),
+            name,
+            gender,
+            skill,
+            games: 0,
+            active: true
+        });
+        
+        document.getElementById('p-name').value = '';
+        saveData();
+        renderPlayers();
+        toggleAddPlayerForm();
+    }
+
+    function toggleActive(id) {
+        const player = players.find(p => p.id === id);
+        if(player) {
+            player.active = !player.active;
+            saveData();
+            renderPlayers();
+        }
+    }
+
+    function removePlayer(id) {
+        if(confirm('Delete player? Data will be lost.')) {
+            players = players.filter(p => p.id !== id);
+            saveData();
+            renderPlayers();
+        }
+    }
+
+    function renderPlayers() {
+        const list = document.getElementById('player-list');
+        list.innerHTML = '';
+        let activeCount = 0;
+        
+        players.sort((a,b) => a.name.localeCompare(b.name)).forEach(p => {
+            if(p.active) activeCount++;
+            list.innerHTML += `
+                <div class="player-row">
+                    <div class="flex align-center">
+                        <input type="checkbox" class="toggle-active" ${p.active ? 'checked' : ''} onchange="toggleActive('${p.id}')">
+                        <div class="player-info">
+                            <span class="player-name">${p.name}</span>
+                            <span class="player-meta">${p.gender} • ${SKILL_MAP[p.skill]} • Games: ${p.games}</span>
+                        </div>
+                    </div>
+                    <button class="danger" style="width: auto; padding: 0.4rem 0.8rem;" onclick="removePlayer('${p.id}')">X</button>
+                </div>
+            `;
+        });
+        document.getElementById('active-count').innerText = activeCount;
+    }
+
+    // --- ALGORITHM: MATCHMAKING ---
+    function getCombinations(arr, k) {
+        let results = [];
+        function run(level, start, initial) {
+            for (let i = start; i < arr.length - k + level + 1; i++) {
+                let next = initial.slice();
+                next.push(arr[i]);
+                if (level === k - 1) results.push(next);
+                else run(level + 1, i + 1, next);
+            }
+        }
+        run(0, 0, []);
+        return results;
+    }
+
+    function getRepeatScore(teamA, teamB) {
+        let penalty = 0;
+        historyData.forEach(match => {
+            const histA = match.teamA.map(p => p.id);
+            const histB = match.teamB.map(p => p.id);
+            const currA = teamA.map(p => p.id);
+            const currB = teamB.map(p => p.id);
+            
+            // Check same team pairings
+            if ((histA.includes(currA[0]) && histA.includes(currA[1])) || 
+                (histB.includes(currA[0]) && histB.includes(currA[1]))) penalty += 2;
+                
+            if ((histA.includes(currB[0]) && histA.includes(currB[1])) || 
+                (histB.includes(currB[0]) && histB.includes(currB[1]))) penalty += 2;
+
+            // Check opponents (simplified check)
+            if (histA.includes(currA[0]) && histB.includes(currB[0])) penalty += 0.5;
+        });
+        return penalty;
+    }
+
+    function evaluateMatch(teamA, teamB, globalMinGames) {
+        // Priority 1: Game count parity (Heavily penalize those above minimum)
+        let gamesSum = 0;
+        [...teamA, ...teamB].forEach(p => {
+            gamesSum += Math.pow(p.games - globalMinGames, 2);
+        });
+
+        // Priority 2: Team Skill Balance
+        const skillA = teamA[0].skill + teamA[1].skill;
+        const skillB = teamB[0].skill + teamB[1].skill;
+        const teamBalance = Math.abs(skillA - skillB);
+
+        // Priority 3: Individual Skill Diff
+        const diffA = Math.abs(teamA[0].skill - teamA[1].skill);
+        const diffB = Math.abs(teamB[0].skill - teamB[1].skill);
+        const indDiff = diffA + diffB;
+
+        // Priority 4: Repeat Avoidance
+        const repeatScore = getRepeatScore(teamA, teamB);
+
+        // Priority 5: Gender Variety (minor tie-breaker)
+        let genderScore = 0;
+        if (teamA[0].gender === teamA[1].gender) genderScore += 1;
+        if (teamB[0].gender === teamB[1].gender) genderScore += 1;
+
+        // Cumulative weighted penalty (Lower is better)
+        const score = (gamesSum * 100000) 
+                    + (teamBalance * 10000) 
+                    + (indDiff * 1000) 
+                    + (repeatScore * 10) 
+                    + genderScore;
+                    
+        return { teamA, teamB, score, stats: { skillA, skillB, diff: teamBalance, gamesSum } };
+    }
+
+    function generateMatch() {
+        const activePlayers = players.filter(p => p.active);
+        if (activePlayers.length < 4) return alert('Need at least 4 active players!');
+
+        // Find global minimum games played among ACTIVE players
+        const globalMinGames = Math.min(...activePlayers.map(p => p.games));
+
+        const combos = getCombinations(activePlayers, 4);
+        let evaluatedMatches = [];
+
+        combos.forEach(combo => {
+            const splits = [
+                [[combo[0], combo[1]], [combo[2], combo[3]]],
+                [[combo[0], combo[2]], [combo[1], combo[3]]],
+                [[combo[0], combo[3]], [combo[1], combo[2]]]
+            ];
+            splits.forEach(split => {
+                evaluatedMatches.push(evaluateMatch(split[0], split[1], globalMinGames));
+            });
+        });
+
+        // Sort by lowest penalty score
+        evaluatedMatches.sort((a, b) => a.score - b.score);
+        
+        // Pick randomly from the top 3 best configurations to prevent predictable repetition
+        const topPoolSize = Math.min(3, evaluatedMatches.length);
+        const selectedMatch = evaluatedMatches[Math.floor(Math.random() * topPoolSize)];
+        
+        currentPendingMatch = selectedMatch;
+        renderCurrentMatch(selectedMatch);
+    }
+
+    function renderCurrentMatch(match) {
+        document.getElementById('current-match').classList.remove('hidden');
+        
+        const renderPlayer = (p) => `
+            <div class="player-row" style="border:none; padding: 0.25rem 0;">
+                <span class="player-name">${p.name} <small style="color:var(--text-light); font-weight:normal;">(${p.gender})</small></span>
+                <span class="player-meta">${SKILL_MAP[p.skill]} | Games: ${p.games}</span>
+            </div>
+        `;
+        
+        document.getElementById('team-a-content').innerHTML = renderPlayer(match.teamA[0]) + renderPlayer(match.teamA[1]);
+        document.getElementById('team-b-content').innerHTML = renderPlayer(match.teamB[0]) + renderPlayer(match.teamB[1]);
+        
+        document.getElementById('match-logic-stats').innerHTML = `
+            <strong>Logic Details:</strong><br>
+            Team A Skill: ${match.stats.skillA} | Team B Skill: ${match.stats.skillB} <br>
+            Skill Difference: ${match.stats.diff}
+        `;
+    }
+
+    function confirmMatch() {
+        if(!currentPendingMatch) return;
+        
+        // Update games count
+        [...currentPendingMatch.teamA, ...currentPendingMatch.teamB].forEach(matchPlayer => {
+            const p = players.find(x => x.id === matchPlayer.id);
+            if(p) p.games += 1;
+        });
+
+        // Save history
+        historyData.unshift({
+            id: Date.now(),
+            date: new Date().toLocaleString(),
+            teamA: currentPendingMatch.teamA,
+            teamB: currentPendingMatch.teamB
+        });
+
+        saveData();
+        currentPendingMatch = null;
+        document.getElementById('current-match').classList.add('hidden');
+        alert('Match Confirmed! Games counted.');
+        switchTab('players');
+    }
+
+    // --- HISTORY & STATS ---
+    function renderHistory() {
+        const list = document.getElementById('history-list');
+        list.innerHTML = '';
+        historyData.forEach((match, index) => {
+            const teamAStr = match.teamA.map(p => p.name).join(' & ');
+            const teamBStr = match.teamB.map(p => p.name).join(' & ');
+            
+            list.innerHTML += `
+                <div class="card">
+                    <div style="font-size:0.8rem; color:var(--text-light); margin-bottom:0.5rem;">${match.date}</div>
+                    <div class="flex justify-between align-center">
+                        <div style="font-size: 0.95rem;">
+                            <strong>A:</strong> ${teamAStr}<br>
+                            <strong>B:</strong> ${teamBStr}
+                        </div>
+                        ${index === 0 ? `<button class="outline" style="width:auto; padding:0.4rem;" onclick="undoMatch(${match.id})">Undo</button>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    function undoMatch(matchId) {
+        if(!confirm('Undo this match and decrease player game counts?')) return;
+        const match = historyData.find(m => m.id === matchId);
+        if(match) {
+            [...match.teamA, ...match.teamB].forEach(matchPlayer => {
+                const p = players.find(x => x.id === matchPlayer.id);
+                if(p && p.games > 0) p.games -= 1;
+            });
+            historyData = historyData.filter(m => m.id !== matchId);
+            saveData();
+            renderHistory();
+        }
+    }
+
+    function clearHistory() {
+        if(confirm('Clear all match history? (Player game counts will NOT be reset)')) {
+            historyData = [];
+            saveData();
+            renderHistory();
+        }
+    }
+
+    function renderStats() {
+        const list = document.getElementById('stats-list');
+        list.innerHTML = '';
+        
+        let sortedPlayers = [...players].sort((a,b) => b.games - a.games);
+        sortedPlayers.forEach(p => {
+            list.innerHTML += `
+                <div class="player-row">
+                    <div class="player-name">${p.name}</div>
+                    <div style="font-weight:bold; color:var(--primary);">Games: ${p.games}</div>
+                </div>
+            `;
+        });
+    }
+
+    // Service Worker Registration
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(err => console.log('Service Worker failed', err));
+    }
+
+    // Init
+    renderPlayers();
+</script>
+</body>
+</html>
